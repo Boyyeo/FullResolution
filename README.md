@@ -1,4 +1,4 @@
-# Full Resolution Image Compression with Recurrent Neural Networks
+## Re-implement Full Resolution Image Compression with Recurrent Neural Networks
 
 #### To train Compression Model (Encoder, Binarizer, Decoder) 
 ```
