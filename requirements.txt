@@ -1,0 +1,11 @@
+torch 
+torchvision
+absl-py
+tqdm
+#pip install torchac
+#pip install arithmetic_compressor
+
+#https://arxiv.org/pdf/1811.12817.pdf
+#https://github.com/kedartatwawadi/NN_compression
+#https://github.com/RenYang-home/RLVC
+#https://github.com/kodejuice/arithmetic-compressor/blob/main/arithmetic_compressor/arithmetic_coding.py
