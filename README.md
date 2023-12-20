@@ -15,13 +15,18 @@ CUDA_VISIBLE_DEVICES=0 python pixel_code.py
 python main.py
 ```
 
-#### To download CIFAR-10 Directly 
+#### To download Datasets
+##### CIFAR-10 Directly 
 ```
 git clone https://github.com/YoongiKim/CIFAR-10-images.git
 ```
+##### ImageNet-32x32  (https://image-net.org/download-images.php)
+```
 
+```
 #### Setup Conda Environment 
 ```
 conda create --name fullres python=3.10
 pip install -r requirements.txt
 ```
+
