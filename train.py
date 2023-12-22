@@ -27,6 +27,8 @@ flags.DEFINE_string('name', "experiment", "Folder output sample_image")
 flags.DEFINE_string('data_path', "CIFAR-10-images/train", "Folder of dataset images")
 flags.DEFINE_boolean('save_record', False, "Whether to save the experiment results")
 flags.DEFINE_integer('iterations', 16, "number of iteration of RNN in training")
+flags.DEFINE_string('recon_framework', "one-shot", "[one-shot,additive,residual-scaling]")
+flags.DEFINE_string('architecture', "lstm", "[lstm,gru,residual-gru,associative-lstm]")
 
 def train():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
