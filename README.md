@@ -29,4 +29,8 @@ git clone https://github.com/YoongiKim/CIFAR-10-images.git
 conda create --name fullres python=3.10
 pip install -r requirements.txt
 ```
+You can just use the yml environment.
+```
+conda env create -f /path/to/environment.yml
+```
 
