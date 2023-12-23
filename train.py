@@ -60,7 +60,7 @@ def train(save_dir):
     train_dataset = datasets.ImageFolder(FLAGS.data_path,transform=train_transform) #没有transform，先看看取得的原始图像数据
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=FLAGS.bs,shuffle=True, num_workers=4)
 
-    net = Networks(FLAGS.architecture, FLAGS.recon_framework)
+    net = Networks(FLAGS.arch, FLAGS.recon_fw)
     net.Enc = net.Enc.to(device)
     net.Binarizer = net.Binarizer.to(device)
     net.Dec = net.Dec.to(device)
