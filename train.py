@@ -15,6 +15,8 @@ import torchvision.datasets as datasets
 from network import * 
 from torch.autograd import Variable
 from tqdm import tqdm 
+from datetime import datetime
+import requests
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('seed', 0, "random seed")
@@ -27,28 +29,49 @@ flags.DEFINE_string('name', "experiment", "Folder output sample_image")
 flags.DEFINE_string('data_path', "CIFAR-10-images/train", "Folder of dataset images")
 flags.DEFINE_boolean('save_record', False, "Whether to save the experiment results")
 flags.DEFINE_integer('iterations', 16, "number of iteration of RNN in training")
-flags.DEFINE_string('recon_framework', "one-shot", "[one-shot,additive,residual-scaling]")
-flags.DEFINE_string('architecture', "lstm", "[lstm,gru,residual-gru,associative-lstm]")
+flags.DEFINE_string('recon_framework', "one-shot", "[one-shot, additive, residual-scaling]")
+flags.DEFINE_string('architecture', "lstm", "[lstm, gru, residual-gru, associative-lstms]")
 
-def train():
+
+class Networks:
+    def __init__(self, arch="lstm", recon_fw="one-shot"):
+        self.Enc = EncoderCell()
+        self.Binarizer = Binarizer()
+        self.Dec = DecoderCell()
+        self.recon_fw = recon_fw
+        self.arch = arch
+
+    def save(self, idx, dir):
+        torch.save(self.Enc.state_dict(), f'{dir}/encoder_epoch_{idx}.pth')
+
+        torch.save(self.Binarizer.state_dict(), f'{dir}/binarizer_epoch_{idx}.pth')
+
+        torch.save(self.Dec.state_dict(), f'{dir}/decoder_epoch_{idx}.pth')
+
+
+def train(save_dir):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print("device:", device)
     train_transform = T.Compose(
             [
-            T.RandomHorizontalFlip(),
-            T.ToTensor()])
+            T.ToTensor(),
+            T.Normalize((0.5,), (0.5,))])
 
     train_dataset = datasets.ImageFolder(FLAGS.data_path,transform=train_transform) #没有transform，先看看取得的原始图像数据
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=FLAGS.bs,shuffle=True, num_workers=4)
-    net_Enc = EncoderCell().to(device)
-    net_Binarizer = Binarizer().to(device)
-    net_Dec = DecoderCell().to(device)
-    optimizer = optim.Adam(list(net_Enc.parameters()) + list(net_Binarizer.parameters()) + list(net_Dec.parameters()),lr=FLAGS.lr)
+
+    net = Networks(FLAGS.architecture, FLAGS.recon_framework)
+    net.Enc = net.Enc.to(device)
+    net.Binarizer = net.Binarizer.to(device)
+    net.Dec = net.Dec.to(device)
+
+    optimizer = optim.Adam(list(net.Enc.parameters()) + list(net.Binarizer.parameters()) + list(net.Dec.parameters()),lr=FLAGS.lr)
     scheduler = MultiStepLR(optimizer, milestones=[3, 10, 20, 50, 100], gamma=0.5)
 
     for epoch in range(FLAGS.epoch):
         epoch_loss = 0.0
         for x,_ in tqdm(train_loader):
+            print(f'x size: {x.shape}')
             x = x.to(device)
             ## init lstm state
             encoder_h_1 = (Variable(torch.zeros(x.size(0), 256, 8, 8).cuda()),
@@ -72,13 +95,21 @@ def train():
 
             losses = []
             res = patches - 0.5
+            res_0 = res
+            reon_imgs = 0 # recon_imgs shape: [32, 3, 32, 32] [batch size, channel, w, h]
 
 
             for _ in range(FLAGS.iterations):
-                encoded, encoder_h_1, encoder_h_2, encoder_h_3 = net_Enc(res, encoder_h_1, encoder_h_2, encoder_h_3)
-                codes = net_Binarizer(encoded)
-                output, decoder_h_1, decoder_h_2, decoder_h_3, decoder_h_4 = net_Dec(codes, decoder_h_1, decoder_h_2, decoder_h_3, decoder_h_4)
-                res = res - output
+                encoded, encoder_h_1, encoder_h_2, encoder_h_3 = net.Enc(res, encoder_h_1, encoder_h_2, encoder_h_3)
+                codes = net.Binarizer(encoded)
+                output, decoder_h_1, decoder_h_2, decoder_h_3, decoder_h_4 = net.Dec(codes, decoder_h_1, decoder_h_2, decoder_h_3, decoder_h_4)
+
+                if net.recon_fw == "one-shot":
+                    recon_imgs = output
+                elif net.arch == "additive":
+                    recon_imgs += output
+                
+                res = res_0 - recon_imgs
                 losses.append(res.abs().mean())
 
             loss = sum(losses) / FLAGS.iterations
@@ -88,6 +119,12 @@ def train():
         
         epoch_loss /= len(train_loader)
         print("Epoch {}/{} Loss:{} ".format(epoch,FLAGS.epoch,round(epoch_loss,6)))
+        if epoch%10 == 0:
+            send_message("Epoch {}/{} Loss:{} ".format(epoch,FLAGS.epoch,round(epoch_loss,6)))
+
+        if FLAGS.save_record:
+            net.save(epoch, save_dir)
+
 
 
 
@@ -103,13 +140,22 @@ def main(argv):
     if FLAGS.save_record:
         if not os.path.exists(FLAGS.out_dir):
             os.mkdir(FLAGS.out_dir)
-        run = 0
-        while os.path.exists(FLAGS.out_dir + FLAGS.name + str(run) + "/"):
-            run += 1
-        FLAGS.out_dir = FLAGS.out_dir + FLAGS.name + str(run) + "/"
+        now = datetime.now() # current date and time
+        date_time = now.strftime("%Y%m%d-%H%M%S")   
+        FLAGS.out_dir = FLAGS.out_dir + FLAGS.name + date_time + "/"
         os.mkdir(FLAGS.out_dir)
         os.mkdir(FLAGS.out_dir + "checkpoint")
-    train()
+        save_dir = FLAGS.out_dir + "checkpoint"
+        train(save_dir)
+    else:
+        train()
+
+
+# def send_message(message = ''):
+#     headers = {"Authorization": "Bearer " + 'TyIF7OLhJ1oy1UKowBnPRSWi5aDlyGYTbDg1tolnoAe'}
+#     data = { 'message': message }
+#     requests.post("https://notify-api.line.me/api/notify", headers = headers, data = data)
+
 
 
 if __name__ == '__main__':
