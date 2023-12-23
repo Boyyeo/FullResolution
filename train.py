@@ -72,7 +72,7 @@ def train():
             optimizer.zero_grad()
 
             losses = []
-            res = patches - 0.5
+            res = patches 
 
 
             for _ in range(FLAGS.iterations):
