@@ -2,6 +2,9 @@ torch
 torchvision
 absl-py
 tqdm
+matplotlib
+piq 
+
 #pip install torchac
 #pip install arithmetic_compressor
 
@@ -9,3 +12,4 @@ tqdm
 #https://github.com/kedartatwawadi/NN_compression
 #https://github.com/RenYang-home/RLVC
 #https://github.com/kodejuice/arithmetic-compressor/blob/main/arithmetic_compressor/arithmetic_coding.py
+#https://github.com/lyckantropen/psnr_hvsm/tree/main

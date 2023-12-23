@@ -7,20 +7,14 @@ Usage:
 python msssim.py --original_image=original.png --compared_image=distorted.png
 """
 import argparse
-
 import numpy as np
 from scipy import signal
 from scipy.ndimage.filters import convolve
 from PIL import Image
 import matplotlib.pyplot as plt
-
-parser = argparse.ArgumentParser()
-parser.add_argument('--metric', '-m', type=str, default='all', help='metric')
-parser.add_argument(
-    '--original-image', '-o', type=str, required=True, help='original image')
-parser.add_argument(
-    '--compared-image', '-c', type=str, required=True, help='compared image')
-args = parser.parse_args()
+import piq 
+import torch 
+from psnr_hvsm.torch import psnr_hvs_hvsm, bt601ycbcr
 
 
 def _FSpecialGauss(size, sigma):
@@ -203,7 +197,6 @@ def msssim(original, compared):
 
     original = original[None, ...] if original.ndim == 3 else original
     compared = compared[None, ...] if compared.ndim == 3 else compared
-
     return MultiScaleSSIM(original, compared, max_val=255)
 
 
@@ -214,8 +207,7 @@ def psnr(original, compared):
         compared = np.array(Image.open(compared).convert('RGB'), dtype=np.float32)
 
     mse = np.mean(np.square(original - compared))
-    psnr = np.clip(
-        np.multiply(np.log10(255. * 255. / mse[mse > 0.]), 10.), 0., 99.99)[0]
+    psnr = np.clip( np.multiply(np.log10(255. * 255. / mse[mse > 0.]), 10.), 0., 99.99)
     return psnr
 
 
@@ -226,8 +218,7 @@ def psnr_hvs(original, compared, alpha = 0.01, beta = 0.067, gamma = 1.0):
         compared = np.array(Image.open(compared).convert('RGB'), dtype=np.float32)
 
     mse = np.mean(np.square(original - compared))
-    psnr_hvs = np.clip(
-        np.multiply(np.log10(255. * 255. / mse + alpha), beta) + gamma, 0., 99.99)[0]
+    psnr_hvs = np.clip( np.multiply(np.log10(255. * 255. / mse + alpha), beta) + gamma, 0., 99.99)
     return psnr_hvs
 
 
@@ -240,13 +231,38 @@ def show_curve(data, file_name = 'performance', x = 'epoch', y = 'MS_SSIM'):
     plt.legend()
     plt.savefig(file_name)
 
+def ms_ssim_torch(x_batch,y_batch):
+      x_batch = torch.clip(x_batch,min=0.0,max=1.0) * 255
+      y_batch = torch.clip(y_batch,min=0.0,max=1.0) * 255
 
-def main():
-    if args.metric != 'psnr':
-        print(msssim(args.original_image, args.compared_image), end='')
-    if args.metric != 'ssim':
-        print(psnr(args.original_image, args.compared_image), end='')
+      N,C,H,W = x_batch.shape 
+      total_ms_ssim = 0.0
+      for x, y in zip(x_batch, y_batch):
+        x = (x.permute(1,2,0).unsqueeze(0).cpu().numpy())
+        y = (y.permute(1,2,0).unsqueeze(0).cpu().numpy())
+        ms_ssim = MultiScaleSSIM(x, y, max_val=255)
+        total_ms_ssim += ms_ssim 
+
+      return total_ms_ssim / N
+
+
+def psnr_hvs_torch(x, y, alpha = 0.01, beta = 0.067, gamma = 1.0):
+      x = torch.clip(x,min=0.0,max=1.0) * 255
+      y = torch.clip(x,min=0.0,max=1.0) * 255
+      mse = torch.mean(torch.square(x - y))
+      psnr_hvs = torch.clip(torch.multiply(torch.log10(255. * 255. / mse + alpha), beta) + gamma, 0., 99.99)
+      return psnr_hvs 
+
 
 
 if __name__ == '__main__':
-    main()
+    #ssim = msssim('CIFAR-10-images/test/airplane/0000.jpg','CIFAR-10-images/test/airplane/0000.jpg')
+    img1 = torch.rand(32,3,512,512).cuda()
+    img2 = torch.rand(32,3,512,512).cuda()
+    psnr_hvs = psnr_hvs_torch(img1,img2)
+    ms_ssim = ms_ssim_torch(img1,img2)
+    ssim_index = piq.ssim(img1, img1, data_range=1.)
+    psnr_index = piq.psnr(img1, img1, data_range=1., reduction='mean')
+    print("ms-ssim:{} psnr-hvs:{} PSNR :{} SSIM:{}".format(psnr_hvs,ms_ssim,psnr_index,ssim_index))
+  
+
