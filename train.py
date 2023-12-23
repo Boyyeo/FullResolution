@@ -36,8 +36,7 @@ def train():
     train_transform = T.Compose(
             [
             T.RandomHorizontalFlip(),
-            T.ToTensor(),
-            T.Normalize((0.5,), (0.5,))])
+            T.ToTensor()])
 
     train_dataset = datasets.ImageFolder(FLAGS.data_path,transform=train_transform) #没有transform，先看看取得的原始图像数据
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=FLAGS.bs,shuffle=True, num_workers=4)
@@ -72,7 +71,7 @@ def train():
             optimizer.zero_grad()
 
             losses = []
-            res = patches 
+            res = patches - 0.5
 
 
             for _ in range(FLAGS.iterations):
