@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import piq 
 import torch 
 from psnr_hvsm.torch import psnr_hvs_hvsm, bt601ycbcr
+from psnrhvsm import psnrhvsm
 
 
 def _FSpecialGauss(size, sigma):
@@ -210,16 +211,18 @@ def psnr(original, compared):
     psnr = np.clip( np.multiply(np.log10(255. * 255. / mse[mse > 0.]), 10.), 0., 99.99)
     return psnr
 
+def psnr_hvs(original, compared):
+    [p_hvs_m, p_hvs] = psnrhvsm(original, compared)
+    return p_hvs
+# def psnr_hvs(original, compared, alpha = 0.01, beta = 0.067, gamma = 1.0):
+#     if isinstance(original, str):
+#         original = np.array(Image.open(original).convert('RGB'), dtype=np.float32)
+#     if isinstance(compared, str):
+#         compared = np.array(Image.open(compared).convert('RGB'), dtype=np.float32)
 
-def psnr_hvs(original, compared, alpha = 0.01, beta = 0.067, gamma = 1.0):
-    if isinstance(original, str):
-        original = np.array(Image.open(original).convert('RGB'), dtype=np.float32)
-    if isinstance(compared, str):
-        compared = np.array(Image.open(compared).convert('RGB'), dtype=np.float32)
-
-    mse = np.mean(np.square(original - compared))
-    psnr_hvs = np.clip( np.multiply(np.log10(255. * 255. / mse + alpha), beta) + gamma, 0., 99.99)
-    return psnr_hvs
+#     mse = np.mean(np.square(original - compared))
+#     psnr_hvs = np.clip( np.multiply(np.log10(255. * 255. / mse + alpha), beta) + gamma, 0., 99.99)
+#     return psnr_hvs
 
 
 def show_curve(data, file_name = 'performance', x = 'epoch', y = 'MS_SSIM'):
@@ -265,4 +268,3 @@ if __name__ == '__main__':
     psnr_index = piq.psnr(img1, img1, data_range=1., reduction='mean')
     print("ms-ssim:{} psnr-hvs:{} PSNR :{} SSIM:{}".format(psnr_hvs,ms_ssim,psnr_index,ssim_index))
   
-
