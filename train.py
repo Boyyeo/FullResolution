@@ -71,7 +71,6 @@ def train(save_dir):
     for epoch in range(FLAGS.epoch):
         epoch_loss = 0.0
         for x,_ in tqdm(train_loader):
-            print(f'x size: {x.shape}')
             x = x.to(device)
             ## init lstm state
             encoder_h_1 = (Variable(torch.zeros(x.size(0), 256, 8, 8).cuda()),
