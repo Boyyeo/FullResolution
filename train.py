@@ -118,8 +118,8 @@ def train(save_dir):
         
         epoch_loss /= len(train_loader)
         print("Epoch {}/{} Loss:{} ".format(epoch,FLAGS.epoch,round(epoch_loss,6)))
-        if epoch%10 == 0:
-            send_message("Epoch {}/{} Loss:{} ".format(epoch,FLAGS.epoch,round(epoch_loss,6)))
+        # if epoch%10 == 0:
+        #     send_message("Epoch {}/{} Loss:{} ".format(epoch,FLAGS.epoch,round(epoch_loss,6)))
 
         if FLAGS.save_record:
             net.save(epoch, save_dir)
