@@ -91,8 +91,7 @@ def train(save_dir):
 
     for epoch in range(start_epoch,FLAGS.epoch):
         epoch_loss = 0.0
-        if FLAGS.save_record:
-            net.save(epoch, save_dir)
+        
         for x,_ in tqdm(train_loader):
             x = x.to(device)
             ## init lstm state
@@ -131,12 +130,13 @@ def train(save_dir):
             epoch_loss += loss.item()
             loss.backward()
             optimizer.step()
-        
         epoch_loss /= len(train_loader)
         print("Epoch {}/{} Loss:{} ".format(epoch,FLAGS.epoch,round(epoch_loss,6)))
 
         ###### EVALUATION ######
-        eval(net)
+        if FLAGS.save_record:
+            net.save(epoch, save_dir)
+            eval(net,epoch)
 
     if FLAGS.epoch <= 0:
         eval(net, -1)
