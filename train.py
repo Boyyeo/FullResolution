@@ -66,7 +66,7 @@ def train(save_dir):
     net.Dec = net.Dec.to(device)
 
     optimizer = optim.Adam(list(net.Enc.parameters()) + list(net.Binarizer.parameters()) + list(net.Dec.parameters()),lr=FLAGS.lr)
-    scheduler = MultiStepLR(optimizer, milestones=[3, 10, 20, 50, 100], gamma=0.5)
+    #scheduler = MultiStepLR(optimizer, milestones=[3, 10, 20, 50, 100], gamma=0.5)
 
     for epoch in range(FLAGS.epoch):
         epoch_loss = 0.0
@@ -105,7 +105,7 @@ def train(save_dir):
 
                 if net.recon_fw == "one-shot":
                     recon_imgs = output
-                elif net.arch == "additive":
+                elif net.recon_fw == "additive":
                     recon_imgs += output
                 
                 res = res_0 - recon_imgs
