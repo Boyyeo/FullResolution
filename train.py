@@ -138,10 +138,12 @@ def train(save_dir):
                     if it != 0 :
                         gain = net.GainEstimator(res_bar)
                         upsampled_gain = zero_order_hold_upsampling(gain,h=res_bar.shape[-2],w=res_bar.shape[-1])
+                        #print("upsampled_gain:{} res:{} res_bar:{} gain:{}".format(upsampled_gain.shape,res.shape,res_bar.shape,gain.shape))
                     else:
-                        upsampled_gain = torch.ones((32, 1, 32, 32)).to(device)
-            
-                    enc_input = torch.mul(res, upsampled_gain) # res multiply ZOH(gain)
+                        upsampled_gain = torch.ones((res.shape[0], 1, 32, 32)).to(device)
+
+                        enc_input = torch.mul(res, upsampled_gain) # res multiply ZOH(gain)
+                   
                 else:
                     enc_input = res
 
