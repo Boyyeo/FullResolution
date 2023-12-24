@@ -140,7 +140,6 @@ def train(save_dir):
                     if it != 0 :
                         gain = net.GainEstimator(res_bar)
                         upsampled_gain = zero_order_hold_upsampling(gain)
-                        print("upsampled_gain:",upsampled_gain)
                     else:
                         upsampled_gain = torch.ones((32, 1, 32, 32)).to(device)
 
