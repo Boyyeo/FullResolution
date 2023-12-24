@@ -215,7 +215,7 @@ def eval(net, epoch):
                     gain = net.GainEstimator(res_bar)
                     upsampled_gain = zero_order_hold_upsampling(gain)
                 else:
-                    upsampled_gain = torch.ones((32, 1, 32, 32)).to(net.device)
+                    upsampled_gain = torch.ones((32, 1, 32, 32)).cuda()
         
                 enc_input = torch.mul(res, upsampled_gain) # res multiply ZOH(gain)
             else:
