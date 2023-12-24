@@ -38,9 +38,9 @@ flags.DEFINE_string('resume_ckpt', None, "path to checkpoint")
 
 
 
-def zero_order_hold_upsampling(x):
+def zero_order_hold_upsampling(x,h,w):
     # [32, 1, 2, 2] -> [32, 1, 32, 32]
-    upsampled = F.interpolate(x, scale_factor=16)
+    upsampled = F.interpolate(x, size=(h,w))
     # print(f'upsampled shape: {upsampled.shape}')
     return upsampled
 
@@ -137,7 +137,7 @@ def train(save_dir):
                     # update gain factor
                     if it != 0 :
                         gain = net.GainEstimator(res_bar)
-                        upsampled_gain = zero_order_hold_upsampling(gain)
+                        upsampled_gain = zero_order_hold_upsampling(gain,h=res_bar.shape[-2],w=res_bar.shape[-1])
                     else:
                         upsampled_gain = torch.ones((32, 1, 32, 32)).to(device)
             
@@ -213,10 +213,11 @@ def eval(net, epoch):
                 # update gain factor
                 if iters != 0 :
                     gain = net.GainEstimator(res_bar)
-                    upsampled_gain = zero_order_hold_upsampling(gain)
+                    upsampled_gain = zero_order_hold_upsampling(gain,h=res_bar.shape[-2],w=res_bar.shape[-1])
                 else:
-                    upsampled_gain = torch.ones((32, 1, 32, 32)).cuda()
-        
+                    upsampled_gain = torch.ones((batch_size, 1, height, width)).cuda()
+
+            
                 enc_input = torch.mul(res, upsampled_gain) # res multiply ZOH(gain)
             else:
                 enc_input = res
