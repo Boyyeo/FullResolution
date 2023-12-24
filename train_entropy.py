@@ -51,7 +51,7 @@ def zero_order_hold_upsampling(x,h,w):
 class RNNConditionalProbabilityModel(nn.Module):
   def __init__(self, bottleneck_dim=32):
     super(RNNConditionalProbabilityModel, self).__init__()
-    self.model = PixelRNN(num_layers=3, hidden_dims=64, input_size=2)
+    self.model = PixelRNN(num_layers=6, hidden_dims=32, input_size=2)
     self.coder = AECompressor_RNN()
 
   def process_prob(self,prob):
