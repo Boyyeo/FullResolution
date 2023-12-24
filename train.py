@@ -142,7 +142,7 @@ def train(save_dir):
                     else:
                         upsampled_gain = torch.ones((res.shape[0], 1, 32, 32)).to(device)
 
-                        enc_input = torch.mul(res, upsampled_gain) # res multiply ZOH(gain)
+                    enc_input = torch.mul(res, upsampled_gain) # res multiply ZOH(gain)
                    
                 else:
                     enc_input = res
