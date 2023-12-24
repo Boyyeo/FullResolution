@@ -131,10 +131,8 @@ def train(save_dir):
             res = patches - 0.5
             res_0 = res
             recon_imgs = torch.zeros_like(res_0).to(device) # recon_imgs shape: [32, 3, 32, 32] [batch size, channel, w, h]
-            gain = torch.ones((32, 1, 2, 2)).to(device)
 
             for it in range(FLAGS.iterations):
-
                 if net.recon_fw == "residual-scaling":
                     # update gain factor
                     if it != 0 :
@@ -142,25 +140,22 @@ def train(save_dir):
                         upsampled_gain = zero_order_hold_upsampling(gain)
                     else:
                         upsampled_gain = torch.ones((32, 1, 32, 32)).to(device)
-
+            
                     enc_input = torch.mul(res, upsampled_gain) # res multiply ZOH(gain)
-       
-                    encoded, encoder_h_1, encoder_h_2, encoder_h_3 = net.Enc(enc_input, encoder_h_1, encoder_h_2, encoder_h_3)
-                    codes = net.Binarizer(encoded)
-                    output, decoder_h_1, decoder_h_2, decoder_h_3, decoder_h_4 = net.Dec(codes, decoder_h_1, decoder_h_2, decoder_h_3, decoder_h_4)
+                else:
+                    enc_input = res
+
+                encoded, encoder_h_1, encoder_h_2, encoder_h_3 = net.Enc(enc_input, encoder_h_1, encoder_h_2, encoder_h_3)
+                codes = net.Binarizer(encoded)
+                output, decoder_h_1, decoder_h_2, decoder_h_3, decoder_h_4 = net.Dec(codes, decoder_h_1, decoder_h_2, decoder_h_3, decoder_h_4)
+                
+                if net.recon_fw == "residual-scaling":
                     res_bar = torch.div(output, upsampled_gain) # output divide ZOH(gain)
                     recon_imgs += res_bar
-                   
-
-                else:
-                    encoded, encoder_h_1, encoder_h_2, encoder_h_3 = net.Enc(res, encoder_h_1, encoder_h_2, encoder_h_3)
-                    codes = net.Binarizer(encoded)
-                    output, decoder_h_1, decoder_h_2, decoder_h_3, decoder_h_4 = net.Dec(codes, decoder_h_1, decoder_h_2, decoder_h_3, decoder_h_4)
-                    
-                    if net.recon_fw == "one-shot":
-                        recon_imgs = output
-                    elif net.recon_fw == "additive":
-                        recon_imgs += output
+                elif net.recon_fw == 'one-shot':
+                    recon_imgs = output
+                elif net.recon_fw == 'additive':
+                    recon_imgs += output
                                 
                 res = res_0 - recon_imgs
                 losses.append(res.abs().mean())
@@ -213,16 +208,35 @@ def eval(net, epoch):
         #psnr_list, ssim_list, ms_ssim_list, psnr_hvs_list = [],[],[],[] 
         print("--------------------------------------------------------------------------------")
         for iters in range(FLAGS.iterations):
-            encoded, encoder_h_1, encoder_h_2, encoder_h_3 = net.Enc(res, encoder_h_1, encoder_h_2, encoder_h_3)
+
+            if net.recon_fw == "residual-scaling":
+                # update gain factor
+                if iters != 0 :
+                    gain = net.GainEstimator(res_bar)
+                    upsampled_gain = zero_order_hold_upsampling(gain)
+                else:
+                    upsampled_gain = torch.ones((32, 1, 32, 32)).to(net.device)
+        
+                enc_input = torch.mul(res, upsampled_gain) # res multiply ZOH(gain)
+            else:
+                enc_input = res
+
+            encoded, encoder_h_1, encoder_h_2, encoder_h_3 = net.Enc(enc_input, encoder_h_1, encoder_h_2, encoder_h_3)
             code = net.Binarizer(encoded)
             output, decoder_h_1, decoder_h_2, decoder_h_3, decoder_h_4 = net.Dec(code, decoder_h_1, decoder_h_2, decoder_h_3, decoder_h_4)
             codes.append(code.data.cpu().numpy())
-            if net.recon_fw == "one-shot":
+
+            if net.recon_fw == "residual-scaling":
+                res_bar = torch.div(output, upsampled_gain) # output divide ZOH(gain)
+                recon_imgs += res_bar
+            elif net.recon_fw == 'one-shot':
                 recon_imgs = output
-            elif net.recon_fw == "additive":
+            elif net.recon_fw == 'additive':
                 recon_imgs += output
+                            
             res = res_0 - recon_imgs
             losses.append(res.abs().mean())
+
             saved_recon_imgs = torch.clip(recon_imgs + 0.5,min=0.0,max=1.0).data.cpu()
             save_image(saved_recon_imgs,'{}/iter_{}.png'.format(save_img_folder,str(iters).zfill(2)))
             psnr_index, ssim_index, ms_ssim_index, psnr_hvs_index = psnr(image.cpu(),saved_recon_imgs), ssim(image.cpu(),saved_recon_imgs), ms_ssim_torch(image.cpu(),saved_recon_imgs), psnr_hvs_torch(image.cpu(),saved_recon_imgs)
