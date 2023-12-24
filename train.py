@@ -65,7 +65,7 @@ class Networks:
                 'epoch':idx,
                 'gain': self.GainEstimator}
         
-        torch.save(checkpoint,'{}/model_{}.pyt'.format(dir,idx))
+        torch.save(checkpoint,'{}/model_{}.pyt'.format(dir,'last'))
 
     def load(self):
         checkpoint = torch.load(FLAGS.resume_ckpt)
@@ -172,7 +172,8 @@ def train(save_dir):
         ###### EVALUATION ######
         if FLAGS.save_record:
             net.save(epoch, save_dir)
-            eval(net,epoch)
+            if epoch % 10 == 0:
+                eval(net,epoch)
 
     if FLAGS.epoch <= 0:
         eval(net, -1)
@@ -186,76 +187,74 @@ def eval(net, epoch):
     test_image_paths =  os.listdir(FLAGS.eval_path)
     test_image_paths.sort()
     test_image_paths = [os.path.join(FLAGS.eval_path,path) for path in test_image_paths]
-    with torch.no_grad():
-        for test_path in tqdm(test_image_paths):
-            save_img_folder = save_folder_path + '{}/'.format(test_path.split('/')[-1].split('.png')[0]) #e.g output/exp/eval_kodak/epoch_0/kodim12/
-            os.makedirs(save_img_folder,exist_ok=True)
-            print("Evluating image:{} ...".format(test_path))
+    for test_path in tqdm(test_image_paths):
+        save_img_folder = save_folder_path + '{}/'.format(test_path.split('/')[-1].split('.png')[0]) #e.g output/exp/eval_kodak/epoch_0/kodim12/
+        os.makedirs(save_img_folder,exist_ok=True)
+        print("Evluating image:{} ...".format(test_path))
 
-            image = T.ToTensor()(Image.open(test_path).convert('RGB')).unsqueeze(0).cuda()
-            batch_size, C, height, width = image.shape
-            encoder_h_1 = (Variable(torch.zeros(batch_size, 256, height // 4, width // 4)).cuda(), Variable(torch.zeros(batch_size, 256, height // 4, width // 4)).cuda())
-            encoder_h_2 = (Variable(torch.zeros(batch_size, 512, height // 8, width // 8)).cuda(),Variable(torch.zeros(batch_size, 512, height // 8, width // 8)).cuda())
-            encoder_h_3 = (Variable(torch.zeros(batch_size, 512, height // 16, width // 16)).cuda(),Variable(torch.zeros(batch_size, 512, height // 16, width // 16)).cuda())
+        image = T.ToTensor()(Image.open(test_path).convert('RGB')).unsqueeze(0).cuda()
+        batch_size, C, height, width = image.shape
+        encoder_h_1 = (Variable(torch.zeros(batch_size, 256, height // 4, width // 4), volatile=True).cuda(), Variable(torch.zeros(batch_size, 256, height // 4, width // 4),volatile=True).cuda())
+        encoder_h_2 = (Variable(torch.zeros(batch_size, 512, height // 8, width // 8), volatile=True).cuda(),Variable(torch.zeros(batch_size, 512, height // 8, width // 8),volatile=True).cuda())
+        encoder_h_3 = (Variable(torch.zeros(batch_size, 512, height // 16, width // 16), volatile=True).cuda(),Variable(torch.zeros(batch_size, 512, height // 16, width // 16),volatile=True).cuda())
 
-            decoder_h_1 = (Variable(torch.zeros(batch_size, 512, height // 16, width // 16)).cuda(),Variable(torch.zeros(batch_size, 512, height // 16, width // 16)).cuda())
-            decoder_h_2 = (Variable(torch.zeros(batch_size, 512, height // 8, width // 8)).cuda(),Variable(torch.zeros(batch_size, 512, height // 8, width // 8)).cuda())
-            decoder_h_3 = (Variable(torch.zeros(batch_size, 256, height // 4, width // 4)).cuda(),Variable(torch.zeros(batch_size, 256, height // 4, width // 4)).cuda())
-            decoder_h_4 = (Variable(torch.zeros(batch_size, 128, height // 2, width // 2)).cuda(),Variable(torch.zeros(batch_size, 128, height // 2, width // 2)).cuda())
-        
-            codes = []
-            res = image - 0.5
-            res_0 = res
-            recon_imgs = torch.zeros(1, 3, height, width).cuda()
-            losses = []
-            #psnr_list, ssim_list, ms_ssim_list, psnr_hvs_list = [],[],[],[] 
-            print("--------------------------------------------------------------------------------")
-            for iters in range(FLAGS.iterations):
+        decoder_h_1 = (Variable(torch.zeros(batch_size, 512, height // 16, width // 16), volatile=True).cuda(),Variable(torch.zeros(batch_size, 512, height // 16, width // 16),volatile=True).cuda())
+        decoder_h_2 = (Variable(torch.zeros(batch_size, 512, height // 8, width // 8), volatile=True).cuda(),Variable(torch.zeros(batch_size, 512, height // 8, width // 8),volatile=True).cuda())
+        decoder_h_3 = (Variable(torch.zeros(batch_size, 256, height // 4, width // 4), volatile=True).cuda(),Variable(torch.zeros(batch_size, 256, height // 4, width // 4),volatile=True).cuda())
+        decoder_h_4 = (Variable(torch.zeros(batch_size, 128, height // 2, width // 2), volatile=True).cuda(),Variable(torch.zeros(batch_size, 128, height // 2, width // 2),volatile=True).cuda())
+    
+        codes = []
+        res = image - 0.5
+        res_0 = res
+        recon_imgs = torch.zeros(1, 3, height, width).cuda()
+        losses = []
+        #psnr_list, ssim_list, ms_ssim_list, psnr_hvs_list = [],[],[],[] 
+        print("--------------------------------------------------------------------------------")
+        for iters in range(FLAGS.iterations):
 
-                if net.recon_fw == "residual-scaling":
-                    # update gain factor
-                    if iters != 0 :
-                        gain = net.GainEstimator(res_bar)
-                        upsampled_gain = zero_order_hold_upsampling(gain,h=res_bar.shape[-2],w=res_bar.shape[-1])
-                    else:
-                        upsampled_gain = torch.ones((batch_size, 1, height, width)).cuda()
-
-                
-                    enc_input = torch.mul(res, upsampled_gain) # res multiply ZOH(gain)
+            if net.recon_fw == "residual-scaling":
+                # update gain factor
+                if iters != 0 :
+                    gain = net.GainEstimator(res_bar)
+                    upsampled_gain = zero_order_hold_upsampling(gain,h=res_bar.shape[-2],w=res_bar.shape[-1])
                 else:
-                    enc_input = res
+                    upsampled_gain = torch.ones((batch_size, 1, height, width)).cuda()
 
-                encoded, encoder_h_1, encoder_h_2, encoder_h_3 = net.Enc(enc_input, encoder_h_1, encoder_h_2, encoder_h_3)
-                code = net.Binarizer(encoded)
-                output, decoder_h_1, decoder_h_2, decoder_h_3, decoder_h_4 = net.Dec(code, decoder_h_1, decoder_h_2, decoder_h_3, decoder_h_4)
-                codes.append(code.data.cpu().numpy())
+                enc_input = torch.mul(res, upsampled_gain) # res multiply ZOH(gain)
+            else:
+                enc_input = res
 
-                if net.recon_fw == "residual-scaling":
-                    res_bar = torch.div(output, upsampled_gain) # output divide ZOH(gain)
-                    recon_imgs += res_bar
-                elif net.recon_fw == 'one-shot':
-                    recon_imgs = output
-                elif net.recon_fw == 'additive':
-                    recon_imgs += output
-                                
-                res = res_0 - recon_imgs
-                losses.append(res.abs().mean())
+            encoded, encoder_h_1, encoder_h_2, encoder_h_3 = net.Enc(enc_input, encoder_h_1, encoder_h_2, encoder_h_3)
+            code = net.Binarizer(encoded)
+            output, decoder_h_1, decoder_h_2, decoder_h_3, decoder_h_4 = net.Dec(code, decoder_h_1, decoder_h_2, decoder_h_3, decoder_h_4)
+            codes.append(code.data.cpu().numpy())
 
-                saved_recon_imgs = torch.clip(recon_imgs + 0.5,min=0.0,max=1.0).data.cpu()
-                save_image(saved_recon_imgs,'{}/iter_{}.png'.format(save_img_folder,str(iters).zfill(2)))
-                psnr_index, ssim_index, ms_ssim_index, psnr_hvs_index = psnr(image.cpu(),saved_recon_imgs), ssim(image.cpu(),saved_recon_imgs), ms_ssim_torch(image.cpu(),saved_recon_imgs), psnr_hvs_torch(image.cpu(),saved_recon_imgs)
-                print("Iter:{} PSNR:{} SSIM:{} MS_SSIM:{} PSNR_HVS:{}".format(str(iters).zfill(2),round(psnr_index.item(),3),round(ssim_index.item(),3),round(ms_ssim_index.item(),3),round(psnr_hvs_index.item(),3)))
-            
-            loss = sum(losses) / FLAGS.iterations
-            codes = (np.stack(codes).astype(np.int8) + 1) // 2
-            print("LOSS:{} IMAGE SHAPE:{} COMPRESSED FULL CODE LENGTH:{}".format(round(loss.item(),4),image.shape,code.shape))
-            print("--------------------------------------------------------------------------------")
+            if net.recon_fw == "residual-scaling":
+                res_bar = torch.div(output, upsampled_gain) # output divide ZOH(gain)
+                recon_imgs += res_bar
+            elif net.recon_fw == 'one-shot':
+                recon_imgs = output
+            elif net.recon_fw == 'additive':
+                recon_imgs += output
+                            
+            res = res_0 - recon_imgs
+            losses.append(res.abs().mean())
 
-            #imsave( os.path.join(args.output, '{:02d}.png'.format(iters)), np.squeeze(image.numpy().clip(0, 1) * 255.0).astype(np.uint8).transpose(1, 2, 0))
-            #print("codes:",codes.shape)
-            #export = np.packbits(codes.reshape(-1))
-            #np.savez_compressed(args.output, shape=codes.shape, codes=export)
-            
+            saved_recon_imgs = torch.clip(recon_imgs + 0.5,min=0.0,max=1.0).data.cpu()
+            save_image(saved_recon_imgs,'{}/iter_{}.png'.format(save_img_folder,str(iters).zfill(2)))
+            psnr_index, ssim_index, ms_ssim_index, psnr_hvs_index = psnr(image.cpu(),saved_recon_imgs), ssim(image.cpu(),saved_recon_imgs), ms_ssim_torch(image.cpu(),saved_recon_imgs), psnr_hvs_torch(image.cpu(),saved_recon_imgs)
+            print("Iter:{} PSNR:{} SSIM:{} MS_SSIM:{} PSNR_HVS:{}".format(str(iters).zfill(2),round(psnr_index.item(),3),round(ssim_index.item(),3),round(ms_ssim_index.item(),3),round(psnr_hvs_index.item(),3)))
+        
+        loss = sum(losses) / FLAGS.iterations
+        codes = (np.stack(codes).astype(np.int8) + 1) // 2
+        print("LOSS:{} IMAGE SHAPE:{} COMPRESSED FULL CODE LENGTH:{}".format(round(loss.item(),4),image.shape,code.shape))
+        print("--------------------------------------------------------------------------------")
+
+        #imsave( os.path.join(args.output, '{:02d}.png'.format(iters)), np.squeeze(image.numpy().clip(0, 1) * 255.0).astype(np.uint8).transpose(1, 2, 0))
+        #print("codes:",codes.shape)
+        #export = np.packbits(codes.reshape(-1))
+        #np.savez_compressed(args.output, shape=codes.shape, codes=export)
+        
 
 
 
