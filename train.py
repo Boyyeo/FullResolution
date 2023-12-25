@@ -47,9 +47,9 @@ def zero_order_hold_upsampling(x,h,w):
 
 class Networks:
     def __init__(self, arch="lstm", recon_fw="one-shot"):
-        self.Enc = EncoderCell()
+        self.Enc = EncoderCell(arch)
         self.Binarizer = Binarizer()
-        self.Dec = DecoderCell()
+        self.Dec = DecoderCell(arch)
         self.recon_fw = recon_fw
         if recon_fw == "residual-scaling":
             self.GainEstimator = GainEstimatorCell()

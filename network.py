@@ -2,16 +2,26 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from modules import ConvLSTMCell, Sign
+from modules import ConvLSTMCell, ConvGRUCell, ConvResidualGRUCell, Sign
 
 
 class EncoderCell(nn.Module):
-    def __init__(self):
+    def __init__(self, arch):
         super(EncoderCell, self).__init__()
+        self.arch = arch
 
         self.conv = nn.Conv2d(
             3, 64, kernel_size=3, stride=2, padding=1, bias=False)
-        self.rnn1 = ConvLSTMCell(
+        
+        RnnCell = None
+        if self.arch == "lstm":
+            RnnCell = ConvLSTMCell
+        elif self.arch == "gru":
+            RnnCell = ConvGRUCell
+        elif self.arch == "residual-gru":
+            RnnCell = ConvResidualGRUCell
+            
+        self.rnn1 = RnnCell(
             64,
             256,
             kernel_size=3,
@@ -19,7 +29,7 @@ class EncoderCell(nn.Module):
             padding=1,
             hidden_kernel_size=1,
             bias=False)
-        self.rnn2 = ConvLSTMCell(
+        self.rnn2 = RnnCell(
             256,
             512,
             kernel_size=3,
@@ -27,7 +37,7 @@ class EncoderCell(nn.Module):
             padding=1,
             hidden_kernel_size=1,
             bias=False)
-        self.rnn3 = ConvLSTMCell(
+        self.rnn3 = RnnCell(
             512,
             512,
             kernel_size=3,
@@ -64,12 +74,22 @@ class Binarizer(nn.Module):
 
 
 class DecoderCell(nn.Module):
-    def __init__(self):
+    def __init__(self, arch):
         super(DecoderCell, self).__init__()
+        self.arch = arch
 
         self.conv1 = nn.Conv2d(
             32, 512, kernel_size=1, stride=1, padding=0, bias=False)
-        self.rnn1 = ConvLSTMCell(
+        
+        RnnCell = None
+        if self.arch == "lstm":
+            RnnCell = ConvLSTMCell
+        elif self.arch == "gru":
+            RnnCell = ConvGRUCell
+        elif self.arch == "residual-gru":
+            RnnCell = ConvResidualGRUCell
+            
+        self.rnn1 = RnnCell(
             512,
             512,
             kernel_size=3,
@@ -77,7 +97,7 @@ class DecoderCell(nn.Module):
             padding=1,
             hidden_kernel_size=1,
             bias=False)
-        self.rnn2 = ConvLSTMCell(
+        self.rnn2 = RnnCell(
             128,
             512,
             kernel_size=3,
@@ -85,7 +105,7 @@ class DecoderCell(nn.Module):
             padding=1,
             hidden_kernel_size=1,
             bias=False)
-        self.rnn3 = ConvLSTMCell(
+        self.rnn3 = RnnCell(
             128,
             256,
             kernel_size=3,
@@ -93,7 +113,7 @@ class DecoderCell(nn.Module):
             padding=1,
             hidden_kernel_size=3,
             bias=False)
-        self.rnn4 = ConvLSTMCell(
+        self.rnn4 = RnnCell(
             64,
             128,
             kernel_size=3,
@@ -101,6 +121,7 @@ class DecoderCell(nn.Module):
             padding=1,
             hidden_kernel_size=3,
             bias=False)
+            
         self.conv2 = nn.Conv2d(
             32, 3, kernel_size=1, stride=1, padding=0, bias=False)
 
