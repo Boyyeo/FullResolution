@@ -194,14 +194,14 @@ def eval(net, epoch):
 
         image = T.ToTensor()(Image.open(test_path).convert('RGB')).unsqueeze(0).cuda()
         batch_size, C, height, width = image.shape
-        encoder_h_1 = (Variable(torch.zeros(batch_size, 256, height // 4, width // 4), volatile=True).cuda(), Variable(torch.zeros(batch_size, 256, height // 4, width // 4),volatile=True).cuda())
-        encoder_h_2 = (Variable(torch.zeros(batch_size, 512, height // 8, width // 8), volatile=True).cuda(),Variable(torch.zeros(batch_size, 512, height // 8, width // 8),volatile=True).cuda())
-        encoder_h_3 = (Variable(torch.zeros(batch_size, 512, height // 16, width // 16), volatile=True).cuda(),Variable(torch.zeros(batch_size, 512, height // 16, width // 16),volatile=True).cuda())
+        encoder_h_1 = (Variable(torch.zeros(batch_size, 256, height // 4, width // 4)).cuda(), Variable(torch.zeros(batch_size, 256, height // 4, width // 4)).cuda())
+        encoder_h_2 = (Variable(torch.zeros(batch_size, 512, height // 8, width // 8)).cuda(),Variable(torch.zeros(batch_size, 512, height // 8, width // 8)).cuda())
+        encoder_h_3 = (Variable(torch.zeros(batch_size, 512, height // 16, width // 16)).cuda(),Variable(torch.zeros(batch_size, 512, height // 16, width // 16)).cuda())
 
-        decoder_h_1 = (Variable(torch.zeros(batch_size, 512, height // 16, width // 16), volatile=True).cuda(),Variable(torch.zeros(batch_size, 512, height // 16, width // 16),volatile=True).cuda())
-        decoder_h_2 = (Variable(torch.zeros(batch_size, 512, height // 8, width // 8), volatile=True).cuda(),Variable(torch.zeros(batch_size, 512, height // 8, width // 8),volatile=True).cuda())
-        decoder_h_3 = (Variable(torch.zeros(batch_size, 256, height // 4, width // 4), volatile=True).cuda(),Variable(torch.zeros(batch_size, 256, height // 4, width // 4),volatile=True).cuda())
-        decoder_h_4 = (Variable(torch.zeros(batch_size, 128, height // 2, width // 2), volatile=True).cuda(),Variable(torch.zeros(batch_size, 128, height // 2, width // 2),volatile=True).cuda())
+        decoder_h_1 = (Variable(torch.zeros(batch_size, 512, height // 16, width // 16)).cuda(),Variable(torch.zeros(batch_size, 512, height // 16, width // 16)).cuda())
+        decoder_h_2 = (Variable(torch.zeros(batch_size, 512, height // 8, width // 8)).cuda(),Variable(torch.zeros(batch_size, 512, height // 8, width // 8)).cuda())
+        decoder_h_3 = (Variable(torch.zeros(batch_size, 256, height // 4, width // 4)).cuda(),Variable(torch.zeros(batch_size, 256, height // 4, width // 4)).cuda())
+        decoder_h_4 = (Variable(torch.zeros(batch_size, 128, height // 2, width // 2)).cuda(),Variable(torch.zeros(batch_size, 128, height // 2, width // 2)).cuda())
     
         codes = []
         res = image - 0.5
