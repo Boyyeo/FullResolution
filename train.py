@@ -15,10 +15,12 @@ from network import *
 from torch.autograd import Variable
 from tqdm import tqdm 
 from datetime import datetime
-from metric import psnr_hvs_torch, ms_ssim_torch
+from metric import ms_ssim_torch
 from piq import ssim, psnr
 from PIL import Image 
 import requests
+import time
+import pandas as pd
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('seed', 0, "random seed")
@@ -81,15 +83,6 @@ class Networks:
 def train(save_dir):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print("device:", device)
-    train_transform = T.Compose(
-            [T.RandomHorizontalFlip(),
-             T.ToTensor()])
-
-   
-
-    train_dataset = datasets.ImageFolder(FLAGS.data_path,transform=train_transform) 
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=FLAGS.bs,shuffle=True, num_workers=4)
-   
 
     net = Networks(FLAGS.arch, FLAGS.recon_fw)
     if FLAGS.resume_ckpt is not None:
@@ -108,6 +101,15 @@ def train(save_dir):
         optimizer = optim.Adam(list(net.Enc.parameters()) + list(net.Binarizer.parameters()) + list(net.Dec.parameters()),lr=FLAGS.lr)
     #scheduler = MultiStepLR(optimizer, milestones=[3, 10, 20, 50, 100], gamma=0.5)
     
+    if FLAGS.epoch <= 0:
+        eval(net, -1)
+
+    train_transform = T.Compose(
+            [T.RandomHorizontalFlip(),
+             T.ToTensor()])
+
+    train_dataset = datasets.ImageFolder(FLAGS.data_path,transform=train_transform) 
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=FLAGS.bs,shuffle=True, num_workers=4)
 
     for epoch in range(start_epoch,FLAGS.epoch):
         epoch_loss = 0.0
@@ -149,6 +151,7 @@ def train(save_dir):
 
                 encoded, encoder_h_1, encoder_h_2, encoder_h_3 = net.Enc(enc_input, encoder_h_1, encoder_h_2, encoder_h_3)
                 codes = net.Binarizer(encoded)
+
                 output, decoder_h_1, decoder_h_2, decoder_h_3, decoder_h_4 = net.Dec(codes, decoder_h_1, decoder_h_2, decoder_h_3, decoder_h_4)
                 
                 if net.recon_fw == "residual-scaling":
@@ -175,18 +178,18 @@ def train(save_dir):
             if epoch % 10 == 0:
                 eval(net,epoch)
 
-    if FLAGS.epoch <= 0:
-        eval(net, -1)
 
 @torch.no_grad()
 def eval(net, epoch):
     save_folder_path = '{}/eval_kodak/epoch_{}/'.format(FLAGS.out_dir,str(epoch).zfill(4))
     os.makedirs(save_folder_path,exist_ok=True)
+    os.makedirs('results/',exist_ok=True)
 
     ##### EVALUATION ####
     test_image_paths =  os.listdir(FLAGS.eval_path)
     test_image_paths.sort()
     test_image_paths = [os.path.join(FLAGS.eval_path,path) for path in test_image_paths]
+    i = 1
     for test_path in tqdm(test_image_paths):
         save_img_folder = save_folder_path + '{}/'.format(test_path.split('/')[-1].split('.png')[0]) #e.g output/exp/eval_kodak/epoch_0/kodim12/
         os.makedirs(save_img_folder,exist_ok=True)
@@ -209,9 +212,9 @@ def eval(net, epoch):
         recon_imgs = torch.zeros(1, 3, height, width).cuda()
         losses = []
         #psnr_list, ssim_list, ms_ssim_list, psnr_hvs_list = [],[],[],[] 
+        results = []
         print("--------------------------------------------------------------------------------")
         for iters in range(FLAGS.iterations):
-
             if net.recon_fw == "residual-scaling":
                 # update gain factor
                 if iters != 0 :
@@ -226,7 +229,9 @@ def eval(net, epoch):
 
             encoded, encoder_h_1, encoder_h_2, encoder_h_3 = net.Enc(enc_input, encoder_h_1, encoder_h_2, encoder_h_3)
             code = net.Binarizer(encoded)
+            start_decode = time.time()
             output, decoder_h_1, decoder_h_2, decoder_h_3, decoder_h_4 = net.Dec(code, decoder_h_1, decoder_h_2, decoder_h_3, decoder_h_4)
+            end_decode = time.time()
             codes.append(code.data.cpu().numpy())
 
             if net.recon_fw == "residual-scaling":
@@ -242,22 +247,24 @@ def eval(net, epoch):
 
             saved_recon_imgs = torch.clip(recon_imgs + 0.5,min=0.0,max=1.0).data.cpu()
             save_image(saved_recon_imgs,'{}/iter_{}.png'.format(save_img_folder,str(iters).zfill(2)))
-            psnr_index, ssim_index, ms_ssim_index, psnr_hvs_index = psnr(image.cpu(),saved_recon_imgs), ssim(image.cpu(),saved_recon_imgs), ms_ssim_torch(image.cpu(),saved_recon_imgs), psnr_hvs_torch(image.cpu(),saved_recon_imgs)
-            print("Iter:{} PSNR:{} SSIM:{} MS_SSIM:{} PSNR_HVS:{}".format(str(iters).zfill(2),round(psnr_index.item(),3),round(ssim_index.item(),3),round(ms_ssim_index.item(),3),round(psnr_hvs_index.item(),3)))
-        
+            psnr_index, ssim_index, ms_ssim_index = psnr(image.cpu(),saved_recon_imgs), ssim(image.cpu(),saved_recon_imgs), ms_ssim_torch(image.cpu(),saved_recon_imgs)
+            print("Iter:{} PSNR:{} SSIM:{} MS_SSIM:{} Decoding Time:{}".format(str(iters).zfill(2),round(psnr_index.item(),3),round(ssim_index.item(),3),round(ms_ssim_index.item(),3),round(end_decode-start_decode,6)))
+            results.append([round(psnr_index.item(),3),round(ssim_index.item(),3),round(ms_ssim_index.item(),3),round(end_decode-start_decode,6)])
+
         loss = sum(losses) / FLAGS.iterations
         codes = (np.stack(codes).astype(np.int8) + 1) // 2
         print("LOSS:{} IMAGE SHAPE:{} COMPRESSED FULL CODE LENGTH:{}".format(round(loss.item(),4),image.shape,code.shape))
         print("--------------------------------------------------------------------------------")
 
+        results_df = pd.DataFrame(results)
+        file_name = 'results/result_' + str(i) + '.csv'
+        results_df.to_csv(file_name, header=['PSNR', 'SSIM', 'MS_SSIM', 'Decoding Time'])
+        i += 1
         #imsave( os.path.join(args.output, '{:02d}.png'.format(iters)), np.squeeze(image.numpy().clip(0, 1) * 255.0).astype(np.uint8).transpose(1, 2, 0))
         #print("codes:",codes.shape)
         #export = np.packbits(codes.reshape(-1))
         #np.savez_compressed(args.output, shape=codes.shape, codes=export)
         
-
-
-
 
 def set_seed(seed):
     random.seed(seed)
