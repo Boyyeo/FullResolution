@@ -75,7 +75,7 @@ class Networks:
         self.Binarizer.load_state_dict(checkpoint['binarizer'])
         self.Dec.load_state_dict(checkpoint['dec'])
         if self.GainEstimator is not None: 
-            self.GainEstimator.load_state_dict(checkpoint['gain'])
+            self.GainEstimator.load_state_dict(checkpoint['gain'].state_dict())
 
         return checkpoint['epoch']
 
